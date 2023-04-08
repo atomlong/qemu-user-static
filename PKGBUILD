@@ -35,6 +35,9 @@ prepare() {
 }
 
 _configure() {
+    # Disable -static-pie due to build error with system libc:
+    # https://bugs.launchpad.net/ubuntu/+source/glibc/+bug/1987438
+    [ $CARCH == aarch64 ] && extra_opt=" --enable-pie"
     ../qemu-${pkgver}/configure \
             --prefix=/usr \
             --sysconfdir=/etc \
@@ -73,7 +76,8 @@ _configure() {
             --disable-zstd \
             --disable-linux-io-uring \
             --disable-bpf \
-            --static
+            --static \
+            ${extra_opt}
 }
 
 build() (
