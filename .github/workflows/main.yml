@@ -1,6 +1,9 @@
   
 name: makepkg CI
 
+permissions:
+  contents: write
+
 on: 
   release:
     types: [published]
@@ -26,7 +29,7 @@ jobs:
       UPSTREAM_URL: ${{ secrets.UPSTREAM_URL }}
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v3.5.2
       with:
         fetch-depth: 0
     - name: Pull upstream changes
@@ -40,10 +43,23 @@ jobs:
         git_pull_args: --rebase
         git_push_args: --force-with-lease
         github_token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Keep Workflow Activity
+      uses: atomlong/Keep-Workflow-Activity-action@master
+      id: keepalive
+    - name: Check Package Marker
+      uses: atomlong/Check-Marker-action@master
+      id: checkmark
+      with:
+        arch: ${{ matrix.arch }}
+        repo: ${{ secrets.PACMAN_REPO }}
+        target_os: Linux
+        marker_path: ${{ secrets.MARKER_PATH }}
+        rclone_config: ${{ secrets.RCLONE_CONF }}
+        update: ${{ steps.keepalive.outputs.activated }}
     - name: Run on Archlinux
       uses: atomlong/run-on-arch-action@alarm
       id: runcmd
-      if: steps.sync.outputs.has_new_commits != 'false'
+      if: steps.checkmark.outputs.marked == 'false'
       with:
         arch: ${{ matrix.arch }}
         githubToken: ${{ github.token }}
@@ -54,7 +70,7 @@ jobs:
         deployPath: ${{ secrets.DEPLOY_PATH }}
         customRepos: ${{ secrets.CUSTOM_REPOS }}
     - name: Send build result via mail
-      uses: atomlong/send-mail-action@v3.7.1
+      uses: atomlong/send-mail-action@v3.7.2
       if: ${{ steps.runcmd.outputs.message != '' }}
       with:
         server_address: ${{secrets.MAIL_HOST}}
@@ -66,7 +82,7 @@ jobs:
         to: ${{secrets.MAIL_TO}}
         from: Github
     - name: Send sync result via mail
-      uses: atomlong/send-mail-action@v3.7.1
+      uses: atomlong/send-mail-action@v3.7.2
       if: ${{ steps.sync.outputs.error_message != '' && matrix.arch == 'armv7' }}
       with:
         server_address: ${{secrets.MAIL_HOST}}
